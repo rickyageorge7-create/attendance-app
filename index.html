@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Check in</title>
+  <style>
+    body { font-family: sans-serif; max-width: 400px; margin: 20px auto; padding: 0 16px; }
+    input, button { width: 100%; padding: 10px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
+    video { width: 100%; border-radius: 8px; background: #000; }
+  </style>
+</head>
+<body>
+  <h2>Attendance</h2>
+  <input id="student_id" placeholder="Enter your Student ID">
+  <button id="go">Next</button>
+  <div id="cam" style="display:none">
+    <video id="video" autoplay muted playsinline></video>
+    <button id="scan">Scan face</button>
+  </div>
+  <p id="msg"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/face.js"></script>
+  <script>
+    const sessionId = new URLSearchParams(location.search).get("s");
+    const video = document.getElementById("video");
+    const msgEl = document.getElementById("msg");
+    const msg = (t) => (msgEl.textContent = t);
+    let student = null;
+
+    if (!sessionId) msg("Invalid QR code. Scan again.");
+
+    document.getElementById("go").onclick = async () => {
+      try {
+        const id = document.getElementById("student_id").value.trim();
+        if (!id) return msg("Enter your ID");
+        const { data } = await db.from("students").select("*").eq("id_number", id).maybeSingle();
+        if (!data) return msg("ID not found");
+        student = data;
+        msg("Loading face scanner...");
+        await loadModels();
+        await startCamera(video);
+        document.getElementById("cam").style.display = "block";
+        msg("Look at the camera, then press Scan");
+      } catch (e) {
+        msg("Error: " + e.message);
+        console.error(e);
+      }
+    };
+
+    document.getElementById("scan").onclick = async () => {
+      try {
+        const d = await getDescriptor(video);
+        if (!d) return msg("No face detected, try again");
+        if (faceDistance(d, student.face_descriptor) > 0.5) return msg("Face does not match this ID");
+        const { error } = await db.from("attendance").insert({ session_id: sessionId, student_id: student.id_number });
+        if (error && error.code === "23505") return msg("Already marked present");
+        msg(error ? "Error: " + error.message : "✅ Present, " + student.full_name);
+      } catch (e) {
+        msg("Error: " + e.message);
+        console.error(e);
+      }
+    };
+  </script>
+</body>
+</html>

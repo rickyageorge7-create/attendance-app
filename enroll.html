@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Enroll Student</title>
+  <style>
+    body { font-family: sans-serif; max-width: 400px; margin: 20px auto; padding: 0 16px; }
+    input, button { width: 100%; padding: 10px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
+    video { width: 100%; border-radius: 8px; background: #000; }
+  </style>
+</head>
+<body>
+  <h2>Enroll student</h2>
+  <input id="student_id" placeholder="Student ID">
+  <input id="student_name" placeholder="Full name">
+  <video id="video" autoplay muted playsinline></video>
+  <button id="btn">Capture face &amp; save</button>
+  <p id="msg"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/face.js"></script>
+  <script>
+    const video = document.getElementById("video");
+    const msgEl = document.getElementById("msg");
+    const msg = (t) => (msgEl.textContent = t);
+
+    (async () => {
+      try {
+        msg("Loading face models...");
+        await loadModels();
+        await startCamera(video);
+        msg("Ready");
+      } catch (e) {
+        msg("Setup error: " + e.message);
+        console.error(e);
+      }
+    })();
+
+    document.getElementById("btn").onclick = async () => {
+      const id = document.getElementById("student_id").value.trim();
+      const full = document.getElementById("student_name").value.trim();
+      if (!id || !full) return msg("Fill in ID and name");
+      const d = await getDescriptor(video);
+      if (!d) return msg("No face found, try again");
+      const { error } = await db.from("students").upsert({ id_number: id, full_name: full, face_descriptor: d });
+      msg(error ? "Error: " + error.message : "Saved!");
+    };
+  </script>
+</body>
+</html>
